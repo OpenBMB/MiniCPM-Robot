@@ -1,0 +1,56 @@
+# MiniCPM-RobotTrack Go2 runtime tuning. CLI options override values in this file.
+runtime:
+  mode: dry-run
+  instruction: "Follow the person ahead"
+  camera_source: go2
+  waypoint_strategy: first
+  skip_jetson_clocks: false
+
+model:
+  # Checkpoint directory under minicpm_robot_track/checkpoints.
+  checkpoint: MiniCPM-RobotTrack
+
+camera:
+  # This is the verified Unitree wired NIC name; confirm it with `ip -br link`.
+  video_network_interface: enP8p1s0
+  video_client_timeout: 3.0
+  jpeg_quality: 60
+  jpeg_encoder: opencv
+  rgb_decode: fast
+  upload_width: 384
+  model_input_mode: center_crop_height
+  model_crop_size: 384
+  # Disable during latency tests or live runs to avoid native-frame JPEG/HTTP work.
+  native_preview: true
+  preview_fps: 10.0
+  max_wait_new_frame_ms: 35.0
+  fresh_frame_age_threshold_ms: 0.0
+
+velocity:
+  vx:
+    # Direction is selected from waypoint-derived vx before scaling.
+    positive_scale: 1.5
+    negative_scale: 2.0
+    # Deadbands are applied after scaling, in m/s.
+    positive_deadband: 0.03
+    negative_deadband: 0
+    # Conservative release default. Raise only after dry-run and stand testing.
+    max_abs: 0.15
+    sign_hysteresis: 0.0
+  wz:
+    scale: 1.2
+    deadband: 0.0
+    # Conservative release default. Raise only after dry-run and stand testing.
+    max_abs: 0.30
+    boost: 1.0
+    boost_threshold: 0.10
+    boost_max: 0.30
+  ema_alpha: 1.0
+
+logging:
+  latency_print_every: 10
+  # Off by default because two software video encoders add CPU load.
+  record_videos: false
+  video_fps: 15
+  # Short MP4 parts keep earlier footage readable after an abrupt power reset.
+  video_segment_seconds: 10

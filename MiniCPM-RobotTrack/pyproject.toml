@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "minicpm-robot-track"
+version = "0.1.0"
+description = "MiniCPM-based visual tracking policy with a funnel MLP action head"
+readme = {text = "MiniCPM-RobotTrack training, evaluation, and Unitree Go2 deployment.", content-type = "text/markdown"}
+requires-python = ">=3.9,<3.12"
+license = {text = "Apache-2.0"}
+dependencies = [
+  "numpy>=1.23,<1.24",
+  "Pillow>=9.5",
+  "torch>=2.1",
+  "transformers>=4.56,<5",
+  "safetensors>=0.4",
+  "sentencepiece>=0.2,<1",
+]
+
+[project.scripts]
+minicpm-robot-track-train = "minicpm_robot_track.training:main"
+minicpm-robot-track-cache = "minicpm_robot_track.precompute:main"
+minicpm-robot-track-eval = "minicpm_robot_track.evaluation.runner:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["minicpm_robot_track*", "evt_bench*"]
+exclude = ["third_party*"]

@@ -1,0 +1,14 @@
+[
+  {"base_velocity": [0.62, 0.00, 0.02], "collision": false, "target_distance": 1.72, "human_center_norm": [0.50, 0.48]},
+  {"base_velocity": [0.64, 0.00, 0.02], "collision": false, "target_distance": 1.69, "human_center_norm": [0.51, 0.48]},
+  {"base_velocity": [0.66, 0.00, 0.01], "collision": false, "target_distance": 1.65, "human_center_norm": [0.51, 0.49]},
+  {"base_velocity": [0.68, 0.00, 0.01], "collision": false, "target_distance": 1.61, "human_center_norm": [0.50, 0.49]},
+  {"base_velocity": [0.66, 0.01, 0.00], "collision": false, "target_distance": 1.58, "human_center_norm": [0.49, 0.49]},
+  {"base_velocity": [0.63, 0.01, -0.01], "collision": false, "target_distance": 1.56, "human_center_norm": [0.49, 0.50]},
+  {"base_velocity": [0.60, 0.00, -0.01], "collision": false, "target_distance": 1.55, "human_center_norm": [0.50, 0.50]},
+  {"base_velocity": [0.58, 0.00, 0.00], "collision": false, "target_distance": 1.54, "human_center_norm": [0.50, 0.50]},
+  {"base_velocity": [0.57, -0.01, 0.01], "collision": false, "target_distance": 1.54, "human_center_norm": [0.51, 0.50]},
+  {"base_velocity": [0.56, -0.01, 0.01], "collision": false, "target_distance": 1.55, "human_center_norm": [0.51, 0.49]},
+  {"base_velocity": [0.55, 0.00, 0.00], "collision": false, "target_distance": 1.56, "human_center_norm": [0.50, 0.49]},
+  {"base_velocity": [0.54, 0.00, 0.00], "collision": false, "target_distance": 1.57, "human_center_norm": [0.50, 0.49]}
+]

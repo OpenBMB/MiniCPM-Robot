@@ -1,0 +1,2 @@
+-r requirements-runtime.txt
+onnx==1.17.0

@@ -1,0 +1,54 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+build/
+dist/
+
+# Editor and operating-system artifacts
+*.bk
+.DS_Store
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Downloaded models and generated features
+models/
+**/vision_cache/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.egg-info/
+*.engine
+*.onnx
+*.whl
+vendor/
+MiniCPM-RobotTrack/minicpm_robot_track/backbones/
+MiniCPM-RobotTrack/minicpm_robot_track/checkpoints/
+# Training and evaluation outputs
+outputs/
+checkpoints/
+results/
+sim_data/raw/
+sim_data/train/
+
+# Licensed simulator assets are downloaded separately.
+data/humanoids/
+data/robots/
+data/scene_datasets/
+
+# Runtime logs, temporary files, and generated robot outputs
+MiniCPM-RobotTrack/logs/*
+!MiniCPM-RobotTrack/logs/.gitkeep
+MiniCPM-RobotTrack/realworld/output/*
+!MiniCPM-RobotTrack/realworld/output/.gitkeep
+*.log
+*.tmp
+*.part*
