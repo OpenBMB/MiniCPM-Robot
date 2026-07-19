@@ -30,7 +30,7 @@
 
 * [2026.07.19] 🔥🔥🔥 我们正式发布并开源了 MiniCPM-Robot，这是 MiniCPM 首个面向物理世界交互的具身智能模型系列。首批发布 [MiniCPM-RobotManip](https://huggingface.co/openbmb/MiniCPM-RobotManip) 与 [MiniCPM-RobotTrack](https://huggingface.co/openbmb/MiniCPM-RobotTrack)，分别面向通用机器人操作和具身目标跟踪。欢迎试用！
 
-* [2026.07.19] 🚀🚀🚀 [PhyAI](https://github.com/MEmbodied/phyai) 已实现对 MiniCPM-Robot 的 Day-0 支持，通过 CUDA Graph 和 Triton 定制融合算子，将 NVIDIA H20 上的推理帧率从 10.12 Hz 提升至 36.77 Hz。
+* [2026.07.19] 🚀🚀🚀 [PhyAI](https://github.com/MEmbodied/phyai) 已实现对 MiniCPM-Robot 的 Day-0 支持，通过 CUDA Graph 和 Triton 定制融合算子，将 NVIDIA H20 上的推理帧率从 10 Hz 提升至 37 Hz。
 
 ## 目录
 
@@ -39,16 +39,10 @@
   - [快速开始](#快速开始)
   - [推理](#推理)
 - [MiniCPM-RobotTrack](#minicpm-robottrack)
-  - [示例](#示例)
-  - [EVT-Bench 结果](#evt-bench-结果)
+  - [榜单结果](#evt-bench-结果)
   - [快速开始](#快速开始-1)
-  - [数据准备](#数据准备)
-  - [微调](#微调)
-  - [模型测评](#模型测评)
-  - [Go2 实机部署](#go2-实机部署)
+  - [Cookbook](#数据准备)
 - [模型仓库](#模型仓库)
-- [许可证](#许可证)
-- [致谢](#致谢)
 
 ## MiniCPM-RobotManip
 <strong>MiniCPM-RobotManip</strong> 是面向具身操作的 1.5B 视觉-语言-动作模型，主要亮点如下：

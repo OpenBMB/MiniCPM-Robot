@@ -30,7 +30,7 @@
 
 * [2026.07.19] 🔥🔥🔥 We release and open-source MiniCPM-Robot, MiniCPM's first embodied intelligence model family for interaction with the physical world. Its first releases are [MiniCPM-RobotManip](https://huggingface.co/openbmb/MiniCPM-RobotManip) for generalist robot manipulation and [MiniCPM-RobotTrack](https://huggingface.co/openbmb/MiniCPM-RobotTrack) for embodied target tracking. Try it now!
 
-* [2026.07.19] 🚀🚀🚀 [PhyAI](https://github.com/MEmbodied/phyai) adds Day-0 support for MiniCPM-Robot, increasing inference throughput on NVIDIA H20 from 10.12 Hz to 36.77 Hz through CUDA Graph and custom Triton fused kernels.
+* [2026.07.19] 🚀🚀🚀 [PhyAI](https://github.com/MEmbodied/phyai) adds Day-0 support for MiniCPM-Robot, increasing inference throughput on NVIDIA H20 from 10 Hz to 37 Hz through CUDA Graph and custom Triton fused kernels.
 
 ## Contents
 
@@ -39,16 +39,10 @@
   - [Quick Start](#quick-start)
   - [Inference](#inference)
 - [MiniCPM-RobotTrack](#minicpm-robottrack)
-  - [Examples](#examples)
-  - [EVT-Bench Results](#evt-bench-results)
+  - [Benchmark Results](#evt-bench-results)
   - [Quick Start](#quick-start-1)
-  - [Data Preparation](#data-preparation)
-  - [Finetuning](#finetuning)
-  - [Evaluation](#evaluation)
-  - [Go2 Deployment](#go2-deployment)
+  - [Cookbook](#data-preparation)
 - [Model Zoo](#model-zoo)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
 
 ## MiniCPM-RobotManip
 <strong>MiniCPM-RobotManip</strong> is a 1.5B vision-language-action model for embodied manipulation with the following highlights:
