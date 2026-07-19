@@ -10,32 +10,23 @@
   <a href="./README.md">English</a> · <b>中文</b>
 </p>
 
-<p align="center">
-  <span style="display: inline-flex; align-items: center; margin-right: 2px;">
-    <img src="./assets/X_logo.jpg" alt="X" width="15" height="15" style="margin-right: 4px;">
-    <a href="assets/x.png" target="_blank"> X</a> &nbsp;|
-  </span>
-  <span style="display: inline-flex; align-items: center; margin-right: 2px;">
-    <img src="./assets/discord_logo.png" alt="Discord" width="15" height="15" style="margin-right: 4px;">
-    <a href="assets/discord.jpeg" target="_blank"> Discord</a> &nbsp;|
-  </span>
-</p>
+<div align="center">
 
-<p align="center">
-  MiniCPM-RobotManip<a href="https://huggingface.co/openbmb/MiniCPM-RobotManip">🤗</a> | MiniCPM-RobotTrack<a href="https://huggingface.co/openbmb/MiniCPM-RobotTrack">🤗</a> | <a href="#快速开始">🍳 Cookbook</a>
-</p>
+[![Github](https://img.shields.io/badge/MiniCPM--Robot-000000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/OpenBMB/MiniCPM-Robot) [![Hugging Face Collection](https://img.shields.io/badge/Models-fcd022?style=for-the-badge&logo=huggingface&logoColor=000)](https://huggingface.co/collections/openbmb/minicpm-robot) [![Cookbook](https://img.shields.io/badge/%F0%9F%8D%B3_cookbook-ff69b4?style=for-the-badge)](#quick-start) [![Lark](https://img.shields.io/badge/Lark-00D6B9?style=for-the-badge&logo=data:image/png;base64,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)](assets/feishu_group.png)
 
-**MiniCPM-Robot** 是 MiniCPM 面向物理世界感知、决策与行动的具身智能模型系列，推动 MiniCPM 从多模态理解走向真实世界交互。目前首批模型包括：
+</div>
 
-- **MiniCPM-RobotManip**：🦾 面向仿真与真实世界中的通用机器人操作。基于 MiniCPM-V 4.6 构建总参数量为 **1.5B** 的通用具身模型，**以一套权重覆盖所有下游任务**，并在**代表性评测中超过 π₀.₅、Qwen-VLA 等参数规模更大的模型**。模型继承了高效视觉编码与 Token 压缩能力，并通过流式推理持续将历史观测纳入模型上下文，在保留 **60 帧历史观测**时将单步计算量从 **125 TFLOPs 降至 3.3 TFLOPs**，支持长达 **1 分钟的视觉记忆**，让 VLA 不再局限于基于单帧观测的反应式动作生成，而能结合长时视觉上下文进行连续决策。
+**MiniCPM-Robot** 是 MiniCPM 面向真实世界感知、决策与行动的具身智能模型系列。首批模型包括：
 
-- **MiniCPM-RobotTrack**：🎯 **首个纯端侧具身目标跟踪方案**，覆盖静态目标、动态目标和对抗目标场景。模型基于 MiniCPM4-0.5B，总参数量为 **0.9B**，通过自进化数据管线与 DAgger 式闭环训练提升长尾场景鲁棒性，并在 **EVT-Bench 上取得开源模型 SOTA**；经过端到端系统优化，可在 Unitree Go2 EDU 本地算力上达到 **5+ FPS 和约 180 ms 时延**，实现**纯视觉、纯本地的自然语言指令跟踪**。
+- **MiniCPM-RobotManip**：🦾 **1.5B** 通用机器人操作 VLA（仿真与真机）。一套权重覆盖下游任务，代表性评测中超过 π₀.₅ (3B)、 Qwen-VLA (5B+) 等更大模型。流式推理保留原生记忆能力，并且维持了和以前一样的响应速度。
+
+- **MiniCPM-RobotTrack**：🎯 **首个纯端侧**具身目标跟踪方案（**0.9B**）。覆盖静态、动态与对抗目标，**EVT-Bench 开源 SOTA**；在 Unitree Go2 EDU 上可达 **5+ FPS / 约 180 ms**，纯视觉、纯本地自然语言跟踪。
 
 <p align="center">
   <img src="MiniCPM-RobotManip/assets/manip_case_zh.gif" width="800" alt="MiniCPM-RobotManip 任务演示" />
 </p>
 
-## 📰 最新动态
+## 🎉 最新动态
 
 * [2026.07.19] 🔥🔥🔥 我们正式发布并开源了 MiniCPM-Robot，这是 MiniCPM 首个面向物理世界交互的具身智能模型系列。首批发布 [MiniCPM-RobotManip](https://huggingface.co/openbmb/MiniCPM-RobotManip) 与 [MiniCPM-RobotTrack](https://huggingface.co/openbmb/MiniCPM-RobotTrack)，分别面向通用机器人操作和具身目标跟踪。欢迎试用！
 
