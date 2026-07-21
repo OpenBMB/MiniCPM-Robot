@@ -52,3 +52,9 @@ MiniCPM-RobotTrack/realworld/output/*
 *.log
 *.tmp
 *.part*
+
+.cursor/
+
+# Local tests
+MiniCPM-RobotManip/tests/
+MiniCPM-RobotManip/command

@@ -1,0 +1,9 @@
+# Copyright 2025 starVLA community. All rights reserved.
+# Licensed under the MIT License.
+# Modifications Copyright 2026 The OpenBMB Team.
+
+# Install these in the external RoboTwin environment. RoboTwin itself provides
+# NumPy; these packages implement image resizing and the MiniCPM wire client.
+msgpack==1.1.2
+Pillow>=10
+websockets>=13.1,<14
