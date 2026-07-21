@@ -1,0 +1,15 @@
+# Copyright 2025 starVLA community. All rights reserved.
+# Licensed under the MIT License.
+# Modifications Copyright 2026 The OpenBMB Team.
+
+policy_name: evaluation.robotwin.model2robotwin_interface
+task_name: null
+task_config: null
+ckpt_setting: null
+seed: null
+instruction_type: unseen
+
+# MiniCPM policy server parameters
+host: "127.0.0.1"
+port: 10093
+action_mode: "abs"

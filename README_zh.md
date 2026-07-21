@@ -125,6 +125,22 @@ python vla_infer.py \
     --text "Pick up the red block." \
     --checkpoint ./checkpoint</code></pre>
 
+### starVLA 兼容 WebSocket 服务
+
+<p>部署服务接收一个当前时间帧以及该时刻的一个或多个同步相机视角，并兼容 starVLA 标准 <code>data.actions</code> 评测协议。首版优先适配 LIBERO、CALVIN 和 RoboTwin。MiniCPM 的 action 无需归一化或反归一化，服务端直接返回模型预测值。</p>
+
+<pre><code class="language-bash">cd MiniCPM-RobotManip
+python -m deployment.model_server.server_policy \
+    --checkpoint ./checkpoint \
+    --device cuda \
+    --host 127.0.0.1 \
+    --port 10093 \
+    --default-embodiment-id 0</code></pre>
+
+<p>当前推理是无状态的；协议已为未来原生流式上下文预留版本化 session/stream 消息类型。请求结构、评测相机顺序、metadata 和扩展契约详见<a href="MiniCPM-RobotManip/deployment/README.md">部署指南</a>。</p>
+
+<p>已迁移的 LIBERO、CALVIN、RoboTwin 评测代码，以及 LIBERO 和 RoboTwin 的多 GPU 启动脚本，详见<a href="MiniCPM-RobotManip/evaluation/README.md">仿真评测指南</a>。仿真器代码、数据集与资产仍需外部安装。</p>
+
 ## MiniCPM-RobotTrack
 <strong>MiniCPM-RobotTrack</strong> 是基于 MiniCPM4-0.5B 的轻量视觉-语言-动作策略，面向具身目标跟踪，主要亮点如下：
 

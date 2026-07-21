@@ -1,0 +1,9 @@
+numpy==1.26.4
+pillow==12.2.0
+torch==2.6.0
+scipy>=1.12,<2
+transformers==5.7.0
+diffusers==0.38.0
+safetensors>=0.4.3
+websockets==16.0
+msgpack==1.1.2
