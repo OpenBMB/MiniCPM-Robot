@@ -6,6 +6,7 @@ msgpack
 numpy
 omegaconf
 Pillow
+scipy>=1.8,<2
 termcolor
 tqdm
 tyro>=0.8,<0.9

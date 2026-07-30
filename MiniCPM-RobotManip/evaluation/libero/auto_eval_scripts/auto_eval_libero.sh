@@ -32,7 +32,7 @@ Environment:
   GPU_LIST           Space/comma-separated fixed slots (default: 0)
   EGL_DEVICE_LIST    EGL device per GPU slot (default: GPU_LIST)
   HOST               Server host (default: 127.0.0.1)
-  BASE_PORT          Port for slot 0; slot N uses BASE_PORT+N (default: 10093)
+  BASE_PORT          Port for slot 0; slot N uses BASE_PORT+N (default: 20000)
   SERVER_TIMEOUT     Metadata/ping readiness timeout (default: 300)
   EMBODIMENT_ID      MiniCPM default embodiment ID (required)
   RUN_ID             Unique output run name (default: UTC timestamp + PID)
@@ -105,14 +105,14 @@ TASK_SUITES="${TASK_SUITES:-libero_10 libero_goal libero_object libero_spatial}"
 GPU_LIST="${GPU_LIST:-0}"
 EGL_DEVICE_LIST="${EGL_DEVICE_LIST:-${GPU_LIST}}"
 HOST="${HOST:-127.0.0.1}"
-BASE_PORT="${BASE_PORT:-10093}"
-SERVER_TIMEOUT="${SERVER_TIMEOUT:-360}"
+BASE_PORT="${BASE_PORT:-20000}"
+SERVER_TIMEOUT="${SERVER_TIMEOUT:-3600}"
 EMBODIMENT_ID="${EMBODIMENT_ID:-}"
 RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 NUM_TRIALS_PER_TASK="${NUM_TRIALS_PER_TASK:-50}"
 NUM_STEPS_WAIT="${NUM_STEPS_WAIT:-10}"
 MAX_TASKS="${MAX_TASKS:--1}"
-SEED="${SEED:-7}"
+SEED="${SEED:-42}"
 
 declare -a checkpoints=()
 if ((${#cli_checkpoints[@]} > 0)); then

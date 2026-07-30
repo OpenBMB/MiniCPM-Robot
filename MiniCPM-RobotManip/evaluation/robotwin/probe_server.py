@@ -7,5 +7,5 @@ from evaluation.common.probe_server import main
 
 if __name__ == "__main__":
     raise SystemExit(
-        main([*sys.argv[1:], "--min-action-dim", "14"])
+        main([*sys.argv[1:], "--min-action-dim", "80"])
     )

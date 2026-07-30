@@ -75,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         checkpoint = resolve_checkpoint(
             os.environ.get("CHECKPOINT", "openbmb/MiniCPM-RobotManip")
         )
-        embodiment_id = int(require_env("EMBODIMENT_ID"))
+        embodiment_id = env_int("EMBODIMENT_ID", 1)
         port = env_int("PORT", 10093)
         num_sequences = env_int("NUM_SEQUENCES", 1000)
         resize_size = env_int("RESIZE_SIZE", 448)
@@ -182,9 +182,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=port,
                 checkpoint=checkpoint,
                 embodiment_id=embodiment_id,
-                min_action_dim=7,
+                min_action_dim=17,
                 request_id="calvin-readiness",
                 timeout=timeout,
+                expected_action_dim=80,
+                expected_state_dim=80,
+                expected_action_chunk_size=30,
             )
             if interrupted:
                 raise RuntimeError("Evaluation interrupted")
@@ -199,6 +202,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 str(port),
                 "--args.resize-size",
                 str(resize_size),
+                "--args.embodiment-id",
+                str(embodiment_id),
                 "--args.calvin-root",
                 str(calvin_root),
                 "--args.dataset-path",

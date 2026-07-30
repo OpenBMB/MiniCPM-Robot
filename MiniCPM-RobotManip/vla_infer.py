@@ -42,8 +42,8 @@ class MiniCPMVLAInference:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
         checkpoint = str(checkpoint_path)
-        self.processor = AutoProcessor.from_pretrained(checkpoint, trust_remote_code=True)
-        self.model = AutoModel.from_pretrained(checkpoint, trust_remote_code=True)
+        self.processor = AutoProcessor.from_pretrained(checkpoint, trust_remote_code=True, local_files_only=True)
+        self.model = AutoModel.from_pretrained(checkpoint, trust_remote_code=True, local_files_only=True)
         self.model.to(self.device).eval()
 
     @staticmethod

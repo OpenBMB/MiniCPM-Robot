@@ -23,6 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--embodiment-id", type=int, required=True)
     parser.add_argument("--min-action-dim", type=int, required=True)
+    parser.add_argument("--expected-action-dim", type=int)
+    parser.add_argument("--expected-state-dim", type=int)
+    parser.add_argument("--expected-action-chunk-size", type=int)
     parser.add_argument("--request-id", default="evaluation-readiness")
     parser.add_argument("--timeout", type=float, default=2)
     return parser
@@ -66,6 +69,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             and not isinstance(chunk_size, bool)
             and chunk_size > 0
         )
+        if args.expected_action_dim is not None:
+            checks["expected_action_dim"] = action_dim == args.expected_action_dim
+        if args.expected_state_dim is not None:
+            checks["expected_state_dim"] = (
+                metadata.get("state_dim") == args.expected_state_dim
+            )
+        if args.expected_action_chunk_size is not None:
+            checks["expected_action_chunk_size"] = (
+                chunk_size == args.expected_action_chunk_size
+            )
+        max_num_embodiments = metadata.get("max_num_embodiments")
+        if max_num_embodiments is not None:
+            checks["embodiment_range"] = (
+                isinstance(max_num_embodiments, int)
+                and not isinstance(max_num_embodiments, bool)
+                and 0 <= args.embodiment_id < max_num_embodiments
+            )
         failed = [name for name, valid in checks.items() if not valid]
         if failed:
             print(

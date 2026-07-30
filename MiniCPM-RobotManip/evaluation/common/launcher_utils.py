@@ -122,6 +122,9 @@ def wait_for_policy_server(
     min_action_dim: int,
     request_id: str,
     timeout: int,
+    expected_action_dim: int | None = None,
+    expected_state_dim: int | None = None,
+    expected_action_chunk_size: int | None = None,
 ) -> None:
     deadline = time.monotonic() + timeout
     last_error = ""
@@ -134,30 +137,38 @@ def wait_for_policy_server(
             )
         remaining = max(0.1, deadline - time.monotonic())
         try:
+            command = [
+                minicpm_python,
+                "-m",
+                "evaluation.common.probe_server",
+                "--host",
+                host,
+                "--port",
+                str(port),
+                "--checkpoint",
+                checkpoint,
+                "--embodiment-id",
+                str(embodiment_id),
+                "--min-action-dim",
+                str(min_action_dim),
+                "--request-id",
+                request_id,
+                "--timeout",
+                str(min(2.0, remaining)),
+            ]
+            for flag, value in (
+                ("--expected-action-dim", expected_action_dim),
+                ("--expected-state-dim", expected_state_dim),
+                ("--expected-action-chunk-size", expected_action_chunk_size),
+            ):
+                if value is not None:
+                    command.extend((flag, str(value)))
             probe = subprocess.run(
-                [
-                    minicpm_python,
-                    "-m",
-                    "evaluation.common.probe_server",
-                    "--host",
-                    host,
-                    "--port",
-                    str(port),
-                    "--checkpoint",
-                    checkpoint,
-                    "--embodiment-id",
-                    str(embodiment_id),
-                    "--min-action-dim",
-                    str(min_action_dim),
-                    "--request-id",
-                    request_id,
-                    "--timeout",
-                    str(min(2.0, remaining)),
-                ],
+                command,
                 env=env,
                 capture_output=True,
                 text=True,
-                timeout=min(5.0, remaining + 1),
+                timeout=min(30.0, remaining + 1),
                 check=False,
             )
         except subprocess.TimeoutExpired:

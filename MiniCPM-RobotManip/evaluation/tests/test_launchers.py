@@ -252,8 +252,8 @@ class LauncherStaticTest(unittest.TestCase):
             },
         )
         self.assertEqual(libero.returncode, 0, libero.stderr)
-        self.assertIn("slot=0 gpu=2 egl=2 port=10093", libero.stdout)
-        self.assertIn("slot=1 gpu=5 egl=5 port=10094", libero.stdout)
+        self.assertIn("slot=0 gpu=2 egl=2 port=20000", libero.stdout)
+        self.assertIn("slot=1 gpu=5 egl=5 port=20001", libero.stdout)
 
         robotwin = run(
             [
@@ -340,6 +340,57 @@ class LauncherStaticTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "disables all GPUs"):
                 launcher.detect_cuda_devices()
 
+    def test_calvin_readiness_requires_exact_unified80d_profile(self) -> None:
+        from evaluation.common import probe_server
+
+        class FakeClient:
+            def __init__(self, metadata) -> None:
+                self.metadata = metadata
+
+            def get_server_metadata(self):
+                return self.metadata
+
+            def ping(self, **kwargs):
+                del kwargs
+                return {"ok": True, "type": "ping"}
+
+            def close(self):
+                pass
+
+        metadata = {
+            "server": "minicpm_robot_manip",
+            "ckpt_path": "fake/model",
+            "default_embodiment_id": 1,
+            "max_num_embodiments": 32,
+            "action_normalization": "none",
+            "actions_ready_for_execution": True,
+            "action_dim": 80,
+            "state_dim": 80,
+            "action_chunk_size": 30,
+        }
+        arguments = [
+            "--host", "127.0.0.1",
+            "--port", "10093",
+            "--checkpoint", "fake/model",
+            "--embodiment-id", "1",
+            "--min-action-dim", "17",
+            "--expected-action-dim", "80",
+            "--expected-state-dim", "80",
+            "--expected-action-chunk-size", "30",
+        ]
+        with mock.patch.object(
+            probe_server, "WebsocketClientPolicy", return_value=FakeClient(metadata)
+        ):
+            self.assertEqual(probe_server.main(arguments), 0)
+
+        mismatched = dict(metadata, state_dim=10)
+        with mock.patch.object(
+            probe_server,
+            "WebsocketClientPolicy",
+            return_value=FakeClient(mismatched),
+        ):
+            self.assertEqual(probe_server.main(arguments), 3)
+
     def test_worker_internal_error_is_recorded(self) -> None:
         from evaluation.robotwin import launcher
 
@@ -359,6 +410,8 @@ class LauncherStaticTest(unittest.TestCase):
                 device="cuda",
                 host="127.0.0.1",
                 server_timeout=1,
+                gripper_threshold=0.5,
+                gripper_close_position=0.0,
                 output_root=root,
                 dry_run=False,
             )
@@ -509,7 +562,12 @@ class MultiGpuLauncherIntegrationTest(unittest.TestCase):
                                 port = line.split(":", 1)[1].strip()
                     trace = os.environ["FAKE_ROBOTWIN_TRACE"]
                     with open(trace, "a", encoding="utf-8") as file:
-                        file.write(json.dumps({"event": "start", "port": port, "time": time.time()}) + "\\n")
+                        file.write(json.dumps({
+                            "event": "start",
+                            "port": port,
+                            "time": time.time(),
+                            "warp_cache_path": os.environ.get("WARP_CACHE_PATH"),
+                        }) + "\\n")
                     expected = int(os.environ.get("FAKE_ROBOTWIN_EXPECTED", "1"))
                     deadline = time.time() + 10
                     while time.time() < deadline:
@@ -570,6 +628,24 @@ class MultiGpuLauncherIntegrationTest(unittest.TestCase):
             self.assertLess(max(starts.values()), min(ends.values()))
             run_dirs = [path for path in output_root.iterdir() if path.is_dir()]
             self.assertEqual(len(run_dirs), 1)
+            records = [
+                json.loads(line)
+                for line in trace.read_text(encoding="utf-8").splitlines()
+            ]
+            cache_paths = {
+                Path(record["warp_cache_path"])
+                for record in records
+                if record["event"] == "start"
+            }
+            self.assertEqual(
+                {path.name for path in cache_paths},
+                {"slot0", "slot1"},
+            )
+            self.assertEqual(
+                {path.parent for path in cache_paths},
+                {run_dirs[0] / ".warp_cache"},
+            )
+            self.assertFalse((run_dirs[0] / ".warp_cache").exists())
             status_lines = (
                 run_dirs[0] / "status.tsv"
             ).read_text(encoding="utf-8").splitlines()
@@ -663,7 +739,6 @@ class MultiGpuLauncherIntegrationTest(unittest.TestCase):
                     "CALVIN_ROOT": str(calvin_root),
                     "CALVIN_DATASET_PATH": str(dataset),
                     "CHECKPOINT": "fake/model",
-                    "EMBODIMENT_ID": "0",
                     "PORT": str(base_port),
                     "READY_TIMEOUT": "10",
                     "OUTPUT_ROOT": str(root / "outputs"),
@@ -703,6 +778,12 @@ class MultiGpuLauncherIntegrationTest(unittest.TestCase):
                     time.sleep(0.1)
                 else:
                     self.fail(f"CALVIN evaluator child PID {child_pid} leaked")
+                manifests = list((root / "outputs").glob("*/run_manifest.tsv"))
+                self.assertEqual(len(manifests), 1)
+                self.assertIn(
+                    "default_embodiment_id\t1",
+                    manifests[0].read_text(encoding="utf-8"),
+                )
                 assert_ports_available(self, base_port, 1)
             finally:
                 if process.poll() is None:

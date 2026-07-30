@@ -44,7 +44,7 @@ TASK_SUITE_NAME=libero_goal \
 bash evaluation/libero/eval_libero.sh
 ```
 
-Both scripts default to `127.0.0.1:10093`. Useful smoke-test variables are
+Both scripts default to `127.0.0.1:20000`. Useful smoke-test variables are
 `MAX_TASKS=1` and `NUM_TRIALS_PER_TASK=1`. The evaluator never loads a
 checkpoint and never derives output paths from one.
 
@@ -94,15 +94,17 @@ and servers.
 ## Evaluation contract
 
 - Camera order is `[agentview, eye_in_hand]`.
-- Both LIBERO images are rotated 180 degrees, then resized to 448×448.
-- Proprioceptive state is not sent; MiniCPM uses its existing 80-D zero state.
-- Requests contain only `examples=[{"image": ..., "lang": ...}]`; no
+- The agent view is rotated 180 degrees; the wrist view remains unmodified.
+- State is `eef_xyz + contiguous-column rotation6D + gripper_closed`. These
+  10 values occupy unified channels `7:17`; all other channels are zero.
+- Requests contain `examples=[{"image": ..., "lang": ..., "state": ...}]`; no
   normalization, un-normalization, DDIM, sampling, or CFG fields are sent.
 - Responses must report `ok=true` and contain finite floating actions with
-  shape `(1, T, D)`, where `D >= 7`.
-- Model action values remain unchanged in the client. LIBERO consumes the
-  first seven dimensions, with its standard binary gripper conversion
-  immediately before `env.step`.
+  shape `(1, T, D)`, where `D >= 17`.
+- LIBERO consumes action channels `7:17`, converts rotation6D to axis-angle,
+  thresholds `gripper_closed` at 0.5, and executes absolute OSC targets.
+- The measured controller pose initializes proprioception; subsequent model
+  queries use the last executed target, matching the training trajectory.
 
 `EMBODIMENT_ID` is required. Confirm it and the checkpoint's action-slot
 semantics for LIBERO before treating success rates as valid. The published

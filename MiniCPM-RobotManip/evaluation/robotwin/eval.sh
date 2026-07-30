@@ -8,7 +8,17 @@ set -euo pipefail
 usage() {
     cat >&2 <<'EOF'
 Usage:
-  bash eval.sh <task_name> <task_config> <run_name> <seed> <gpu_id> [policy_port] [policy_host]
+  bash eval.sh [options] <task_name> <task_config> <run_name> <seed> <gpu_id> [policy_port] [policy_host]
+
+Options:
+  --gripper-threshold VALUE
+                      Gripper-closed predictions at or above VALUE command a
+                      closed gripper (default 0.5). Overrides
+                      ROBOTWIN_GRIPPER_CLOSED_THRESHOLD.
+  --gripper-close-position VALUE
+                      Normalized RoboTwin gripper position used to close
+                      (default 0.0). Overrides
+                      ROBOTWIN_GRIPPER_CLOSE_POSITION.
 
 Environment:
   ROBOTWIN_PATH       External RoboTwin checkout (required)
@@ -17,6 +27,9 @@ Environment:
                       Dotted RoboTwin policy module
   DEPLOY_POLICY_TEMPLATE_PATH
                       Optional deploy_policy.yml template override
+  WARP_CACHE_PATH     Per-evaluator Warp kernel cache. The launcher assigns an
+                      isolated cache per slot; standalone runs use a temporary
+                      cache that is removed on exit.
 EOF
 }
 
@@ -24,6 +37,26 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     usage
     exit 0
 fi
+
+while [[ $# -gt 0 && "$1" == --* ]]; do
+    case "$1" in
+        --gripper-threshold)
+            [[ $# -ge 2 ]] || { echo "$1 requires a value" >&2; exit 1; }
+            export ROBOTWIN_GRIPPER_CLOSED_THRESHOLD="$2"
+            shift 2
+            ;;
+        --gripper-close-position)
+            [[ $# -ge 2 ]] || { echo "$1 requires a value" >&2; exit 1; }
+            export ROBOTWIN_GRIPPER_CLOSE_POSITION="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 if (( $# < 5 || $# > 7 )); then
     usage
@@ -70,11 +103,32 @@ if [[ ! "${policy_host}" =~ ^[A-Za-z0-9.-]+$ ]]; then
     exit 1
 fi
 
+# Validate the gripper knobs here rather than letting the client fail after the
+# simulator has already been built. Unset means "use the client default".
+for var in ROBOTWIN_GRIPPER_CLOSED_THRESHOLD ROBOTWIN_GRIPPER_CLOSE_POSITION; do
+    value="${!var:-}"
+    if [[ -n "${value}" && ! "${value}" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "${var} must be a number, got: ${value}" >&2
+        exit 1
+    fi
+done
+
 runtime_deploy_policy="$(
     mktemp "${TMPDIR:-/tmp}/minicpm_robotwin_deploy.${BASHPID}.XXXXXX.yml"
 )"
+owns_warp_cache=0
+if [[ -z "${WARP_CACHE_PATH:-}" ]]; then
+    WARP_CACHE_PATH="$(
+        mktemp -d "${TMPDIR:-/tmp}/minicpm_robotwin_warp.${BASHPID}.XXXXXX"
+    )"
+    export WARP_CACHE_PATH
+    owns_warp_cache=1
+fi
 cleanup() {
     rm -f "${runtime_deploy_policy}"
+    if (( owns_warp_cache )); then
+        rm -rf -- "${WARP_CACHE_PATH}"
+    fi
 }
 trap cleanup EXIT
 
@@ -88,6 +142,9 @@ export PYTHONPATH="${MINICPM_ROOT}:${robotwin_path}${PYTHONPATH:+:${PYTHONPATH}}
 
 echo "[INFO] RoboTwin task=${task_name} config=${task_config} run=${run_name}"
 echo "[INFO] GPU=${gpu_id} policy=${policy_module} endpoint=${policy_host}:${policy_port}"
+echo "[INFO] WARP_CACHE_PATH=${WARP_CACHE_PATH}"
+echo "[INFO] gripper threshold=${ROBOTWIN_GRIPPER_CLOSED_THRESHOLD:-<client default>}" \
+     "close_position=${ROBOTWIN_GRIPPER_CLOSE_POSITION:-<client default>}"
 
 cd "${robotwin_path}"
 PYTHONWARNINGS=ignore::UserWarning \

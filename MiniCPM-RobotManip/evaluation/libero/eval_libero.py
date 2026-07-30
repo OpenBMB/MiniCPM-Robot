@@ -7,7 +7,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
-import math
 import os
 import pathlib
 import time
@@ -26,19 +25,26 @@ from evaluation.libero.model2libero_interface import ModelClient
 
 LIBERO_DUMMY_ACTION = [0.0] * 6 + [-1.0]
 LIBERO_ENV_RESOLUTION = 256  # Resolution used to render training data.
+LIBERO_PROMPT_TEMPLATE = (
+    "The robot is LIBERO Franka, a simulated single-arm Franka manipulator. "
+    "Its action control method is absolute single-arm end-effector pose in the "
+    "unified 80D layout with gripper closed command, and its action FPS is "
+    "20 Hz. Task: {instruction}"
+)
 
 
-def _binarize_gripper_open(open_val: np.ndarray | float) -> np.ndarray:
-    arr = np.asarray(open_val, dtype=np.float32).reshape(-1)
-    value = float(arr[0])
-    bin_val = 1.0 - 2.0 * (value > 0.5)
-    return np.asarray([bin_val], dtype=np.float32)
+def _matrix_to_rotation6d(matrix: object) -> np.ndarray:
+    """Return LIBERO's contiguous-column rotation6D representation."""
+    rotation = np.asarray(matrix, dtype=np.float32)
+    if rotation.shape != (3, 3):
+        raise ValueError(f"Expected a 3x3 rotation matrix; got {rotation.shape}")
+    return np.concatenate((rotation[:, 0], rotation[:, 1]))
 
 
 @dataclasses.dataclass
 class Args:
     host: str = "127.0.0.1"
-    port: int = 10093
+    port: int = 20000
 
     #################################################################################################################
     # LIBERO environment-specific parameters
@@ -72,19 +78,23 @@ def eval_libero(args: Args) -> None:
     pathlib.Path(args.video_out_path).mkdir(parents=True, exist_ok=True)
 
     if args.task_suite_name == "libero_spatial":
-        max_steps = 220  # Longest training demo has 193 steps.
+        max_steps = 800  # Longest training demo has 193 steps.
     elif args.task_suite_name == "libero_object":
-        max_steps = 280  # Longest training demo has 254 steps.
+        max_steps = 800  # Longest training demo has 254 steps.
     elif args.task_suite_name == "libero_goal":
-        max_steps = 300  # Longest training demo has 270 steps.
+        max_steps = 800  # Longest training demo has 270 steps.
     elif args.task_suite_name == "libero_10":
-        max_steps = 520  # Longest training demo has 505 steps.
+        max_steps = 800  # Longest training demo has 505 steps.
     elif args.task_suite_name == "libero_90":
-        max_steps = 400  # Longest training demo has 373 steps.
+        max_steps = 800  # Longest training demo has 373 steps.
     else:
         raise ValueError(f"Unknown task suite: {args.task_suite_name}")
 
-    client_model = ModelClient(host=args.host, port=args.port)
+    client_model = ModelClient(
+        host=args.host,
+        port=args.port,
+        unified_ee6d=True,
+    )
 
     # Optional smoke-test cap; -1 evaluates the complete suite.
     n_eval_tasks = (
@@ -117,13 +127,21 @@ def eval_libero(args: Args) -> None:
         task_episodes, task_successes = 0, 0
         for episode_idx in tqdm.tqdm(range(args.num_trials_per_task)):
             logging.info("\nTask: %s", task_description)
+            model_instruction = LIBERO_PROMPT_TEMPLATE.format(
+                instruction=task_description
+            )
 
             # Reset environment.
-            client_model.reset(task_description=task_description)
+            client_model.reset(task_description=model_instruction)
             env.reset()
 
             # Set initial states.
             obs = env.set_init_state(initial_states[episode_idx])
+            controller = env.env.robots[0].controller
+            controller.use_delta = True
+            for _ in range(args.num_steps_wait):
+                obs, _, _, _ = env.step(LIBERO_DUMMY_ACTION)
+            controller.use_delta = False
 
             # Setup.
             t = 0
@@ -133,30 +151,21 @@ def eval_libero(args: Args) -> None:
             logging.info("Starting episode %s...", task_episodes + 1)
             step = 0
 
-            while t < max_steps + args.num_steps_wait:
-                # Do nothing initially because the simulator drops objects and
-                # they need time to settle.
-                if t < args.num_steps_wait:
-                    obs, reward, done, info = env.step(LIBERO_DUMMY_ACTION)
-                    t += 1
-                    continue
-
-                # Rotate both views 180 degrees to match training preprocessing.
+            while t < max_steps:
+                # Training uses a rotated agent view and an unmodified wrist view.
                 img = np.ascontiguousarray(obs["agentview_image"][::-1, ::-1])
-                wrist_img = np.ascontiguousarray(
-                    obs["robot0_eye_in_hand_image"][::-1, ::-1]
-                )
+                wrist_img = np.ascontiguousarray(obs["robot0_eye_in_hand_image"])
 
                 # Save the preprocessed agent view for replay video.
                 replay_images.append(img)
 
                 state = np.concatenate(
                     (
-                        obs["robot0_eef_pos"],
-                        _quat2axisangle(obs["robot0_eef_quat"]),
-                        obs["robot0_gripper_qpos"],
+                        np.asarray(controller.ee_pos, dtype=np.float32).reshape(3),
+                        _matrix_to_rotation6d(controller.ee_ori_mat),
+                        np.zeros(1, dtype=np.float32),
                     )
-                )
+                ).astype(np.float32)
 
                 observation = {
                     "observation.primary": np.expand_dims(img, axis=0),
@@ -168,14 +177,13 @@ def eval_libero(args: Args) -> None:
                 }
 
                 # Keep the source camera order: [agentview, eye_in_hand].
-                # Standard MiniCPM LIBERO evaluation intentionally does not send
-                # observation.state; the server supplies its zero80 behavior.
                 example_dict = {
                     "image": [
                         observation["observation.primary"][0],
                         observation["observation.wrist_image"][0],
                     ],
-                    "lang": observation["instruction"][0],
+                    "lang": model_instruction,
+                    "state": observation["observation.state"][0],
                 }
 
                 start_time = time.time()
@@ -193,7 +201,6 @@ def eval_libero(args: Args) -> None:
                 open_gripper = np.asarray(
                     raw_action.get("open_gripper")
                 ).reshape(-1)
-                gripper = _binarize_gripper_open(open_gripper)
 
                 if not (
                     world_vector_delta.size == 3
@@ -203,16 +210,16 @@ def eval_libero(args: Args) -> None:
                     raise ValueError(
                         f"Invalid action sizes: world_vector={world_vector_delta.shape}, "
                         f"rotation_delta={rotation_delta.shape}, "
-                        f"gripper={gripper.shape}"
+                        f"gripper={open_gripper.shape}"
                     )
 
-                delta_action = np.concatenate(
-                    [world_vector_delta, rotation_delta, gripper], axis=0
+                absolute_action = np.concatenate(
+                    [world_vector_delta, rotation_delta, open_gripper], axis=0
                 )
-                full_actions.append(delta_action)
+                full_actions.append(absolute_action)
 
-                # LIBERO consumes [xyz, axis-angle delta, binary gripper].
-                obs, reward, done, info = env.step(delta_action.tolist())
+                # Absolute OSC target: [xyz, axis-angle, binary gripper].
+                obs, reward, done, info = env.step(absolute_action.tolist())
                 if done:
                     task_successes += 1
                     total_successes += 1
@@ -252,6 +259,7 @@ def eval_libero(args: Args) -> None:
             "Current total success rate: %s",
             float(total_successes) / float(total_episodes),
         )
+        env.close()
 
     logging.info(
         "Total success rate: %s",
@@ -276,24 +284,6 @@ def _get_libero_env(task, resolution, seed):
     env = OffScreenRenderEnv(**env_args)
     env.seed(seed)
     return env, task_description
-
-
-def _quat2axisangle(quat):
-    """Convert quaternion to axis-angle, copied from robosuite.
-
-    Source:
-    https://github.com/ARISE-Initiative/robosuite/blob/eafb81f54ffc104f905ee48a16bb15f059176ad3/robosuite/utils/transform_utils.py#L490C1-L512C55
-    """
-    if quat[3] > 1.0:
-        quat[3] = 1.0
-    elif quat[3] < -1.0:
-        quat[3] = -1.0
-
-    den = np.sqrt(1.0 - quat[3] * quat[3])
-    if math.isclose(den, 0.0):
-        return np.zeros(3)
-
-    return (quat[:3] * 2.0 * math.acos(quat[3])) / den
 
 
 def start_debugpy_once():

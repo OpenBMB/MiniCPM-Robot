@@ -42,16 +42,23 @@ from calvin_agent.evaluation.utils import (
 )
 from moviepy.editor import ImageSequenceClip
 from omegaconf import OmegaConf
+from scipy.spatial.transform import Rotation
 from termcolor import colored
 from tqdm import tqdm
 
-from evaluation.libero.model2libero_interface import ModelClient
+from evaluation.calvin.model2calvin_interface import ModelClient
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-EP_LEN = 360
+EP_LEN = 720
+CALVIN_PROMPT_TEMPLATE = (
+    "The robot is CALVIN Franka, a simulated single-arm Franka/Panda manipulator. "
+    "Its action control method is absolute single-arm end-effector pose in the "
+    "unified 80D layout with gripper closed command, and its action FPS is "
+    "10 Hz. Task: {instruction}"
+)
 DEFAULT_EVAL_SEQUENCES_PATH = Path(__file__).resolve().with_name(
     "eval_sequences.json"
 )
@@ -70,6 +77,7 @@ class Args:
     host: str = "127.0.0.1"
     port: int = 10093
     resize_size: int = 448
+    embodiment_id: int = 1
 
     # CALVIN paths. Explicit CLI values take precedence over environment values.
     calvin_root: Path | None = dataclasses.field(
@@ -93,6 +101,7 @@ class Args:
     eval_log_dir: Path = Path("tmp/calvin/eval_logs")
     reset: bool = False
     diverse_inst: bool = False
+    lang_subtask_prefix: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -146,10 +155,44 @@ def _to_uint8(image: np.ndarray) -> np.ndarray:
 
     array = np.asarray(image)
     if np.issubdtype(array.dtype, np.floating):
-        array = (255 * array).astype(np.uint8)
-    elif array.dtype != np.uint8:
-        array = array.astype(np.uint8)
-    return array
+        if array.size and np.isfinite(array).all():
+            if float(array.min()) >= 0.0 and float(array.max()) <= 1.0:
+                array = array * 255.0
+        array = np.nan_to_num(array, nan=0.0, posinf=255.0, neginf=0.0)
+    return np.clip(array, 0, 255).astype(np.uint8)
+
+
+def _to_numpy_flat(values: object) -> np.ndarray:
+    if hasattr(values, "detach"):
+        values = values.detach()
+    if hasattr(values, "cpu"):
+        values = values.cpu()
+    if hasattr(values, "numpy"):
+        values = values.numpy()
+    return np.asarray(values, dtype=np.float32).reshape(-1)
+
+
+def _calvin_ee6d_state(robot_obs: object) -> np.ndarray:
+    """Convert CALVIN proprioception to xyz + rotation6D + gripper_closed."""
+
+    values = _to_numpy_flat(robot_obs)
+    if values.size == 15:
+        gripper_command = values[14]
+    elif values.size == 8:
+        gripper_command = values[7]
+    else:
+        raise ValueError(
+            "CALVIN robot_obs must contain 15 values or reduced state must "
+            f"contain 8 values; got {values.size}"
+        )
+    rotation = Rotation.from_euler("xyz", values[3:6]).as_matrix()
+    rotation6d = rotation[:, :2].reshape(6)
+    gripper_closed = np.asarray(
+        [1.0 if float(gripper_command) < 0 else 0.0], dtype=np.float32
+    )
+    return np.concatenate((values[:3], rotation6d, gripper_closed)).astype(
+        np.float32
+    )
 
 
 class CalvinPolicyClient:
@@ -160,6 +203,7 @@ class CalvinPolicyClient:
         host: str,
         port: int,
         resize_size: int = 448,
+        embodiment_id: int = 1,
     ) -> None:
         # ModelClient is transport-only: checkpoint loading and action scaling
         # belong to the server. MiniCPM actions require no unnormalization.
@@ -167,6 +211,7 @@ class CalvinPolicyClient:
             host=host,
             port=port,
             image_size=[resize_size, resize_size],
+            embodiment_id=embodiment_id,
         )
         self.step_count = 0
         # CALVIN's collect_plan helper checks this optional model attribute.
@@ -176,39 +221,54 @@ class CalvinPolicyClient:
         """Reset action-chunk scheduling at each CALVIN subtask."""
 
         self.step_count = 0
+        self.client.reset(task_description=None)
 
-    def step(self, obs: dict[str, Any], lang_annotation: str) -> np.ndarray:
-        """Return one 7-D CALVIN action from the two synchronized RGB views."""
+    def step(
+        self, obs: dict[str, Any], lang_annotation: str
+    ) -> dict[str, object]:
+        """Return one absolute CALVIN EEF action from unified channels 7:17."""
 
         rgb_static = _to_uint8(obs["rgb_obs"]["rgb_static"])
         rgb_gripper = _to_uint8(obs["rgb_obs"]["rgb_gripper"])
+        model_instruction = CALVIN_PROMPT_TEMPLATE.format(
+            instruction=lang_annotation
+        )
+        robot_obs = obs.get("robot_obs_raw", obs.get("robot_obs"))
+        if robot_obs is None:
+            raise KeyError("CALVIN observation requires robot_obs_raw or robot_obs")
         example = {
             "image": [rgb_static, rgb_gripper],
-            "lang": lang_annotation,
+            "lang": model_instruction,
+            "state": _calvin_ee6d_state(robot_obs),
         }
 
-        model_output = self.client.step(example=example, step=self.step_count)
-        raw_action = model_output["raw_action"]
-        world_vector = np.asarray(
-            raw_action["world_vector"], dtype=np.float32
-        ).reshape(-1)
-        rotation_delta = np.asarray(
-            raw_action["rotation_delta"], dtype=np.float32
-        ).reshape(-1)
-        open_gripper = np.asarray(
-            raw_action["open_gripper"], dtype=np.float32
-        ).reshape(-1)
-        action = np.concatenate(
-            [world_vector, rotation_delta, open_gripper], axis=0
-        ).astype(np.float32)
-        if action.shape != (7,):
-            raise ValueError(
-                "CALVIN requires a 7-D action "
-                f"(3 translation + 3 rotation + 1 gripper), got {action.shape}"
-            )
-
+        action = self.client.step(example=example, step=self.step_count)
         self.step_count += 1
         return action
+
+
+def _calvin_env_action(action: object) -> object:
+    """Adapt the policy envelope to CALVIN's three-part absolute action API."""
+
+    if not isinstance(action, dict):
+        return action
+    if action.get("type") != "cartesian_abs":
+        raise ValueError(
+            "CALVIN action envelope must use type='cartesian_abs'; "
+            f"got {action.get('type')!r}"
+        )
+    values = np.asarray(action.get("action"), dtype=np.float32).reshape(-1)
+    if values.shape != (7,) or not np.isfinite(values).all():
+        raise ValueError(
+            "CALVIN cartesian_abs action must contain 7 finite values; "
+            f"got shape {values.shape}"
+        )
+    if float(values[6]) not in (-1.0, 1.0):
+        raise ValueError(
+            f"CALVIN gripper action must be -1 or 1; got {values[6]!r}"
+        )
+    gripper = int(values[6])
+    return values[:3].copy(), values[3:6].copy(), gripper
 
 
 def make_env(dataset_path: Path):
@@ -252,6 +312,7 @@ def evaluate_policy(
     debug: bool = False,
     reset: bool = False,
     diverse_inst: bool = False,
+    lang_subtask_prefix: bool = True,
 ) -> list[int]:
     """Evaluate the first ``num_sequences`` standard CALVIN task chains."""
 
@@ -330,6 +391,7 @@ def evaluate_policy(
             sequence_i,
             reset=reset,
             diverse_inst=diverse_inst,
+            lang_subtask_prefix=lang_subtask_prefix,
         )
         results.append(result)
         if not debug:
@@ -365,6 +427,7 @@ def evaluate_sequence(
     sequence_i: int = -1,
     reset: bool = False,
     diverse_inst: bool = False,
+    lang_subtask_prefix: bool = True,
 ) -> int:
     """Evaluate one five-instruction CALVIN sequence."""
 
@@ -393,6 +456,7 @@ def evaluate_sequence(
             subtask_i,
             sequence_i,
             diverse_inst=diverse_inst,
+            lang_subtask_prefix=lang_subtask_prefix,
             **reset_kwargs,
         )
         if not success:
@@ -416,6 +480,7 @@ def rollout(
     robot_obs: np.ndarray | None = None,
     scene_obs: np.ndarray | None = None,
     diverse_inst: bool = False,
+    lang_subtask_prefix: bool = True,
 ) -> bool:
     """Roll out one language-conditioned subtask for at most ``EP_LEN`` steps."""
 
@@ -433,6 +498,8 @@ def rollout(
     lang_annotation = lang_annotation.split("\n")[0]
     if "\u2019" in lang_annotation:
         lang_annotation = lang_annotation.replace("\u2019", "'")
+    if lang_subtask_prefix:
+        lang_annotation = f"{subtask}: {lang_annotation}"
 
     policy.reset()
     start_info = env.get_info()
@@ -441,11 +508,8 @@ def rollout(
 
     for step in range(EP_LEN):
         action = policy.step(obs, lang_annotation)
-        if not action.flags.writeable:
-            action = np.array(action, copy=True)
-        action[-1] = 1 if action[-1] > 0 else -1
 
-        obs, _, _, current_info = env.step(action)
+        obs, _, _, current_info = env.step(_calvin_env_action(action))
         if debug:
             img_queue.append(copy.deepcopy(obs["rgb_obs"]["rgb_static"]))
         if step == 0:
@@ -490,6 +554,7 @@ def main(args: Args) -> None:
         host=args.host,
         port=args.port,
         resize_size=args.resize_size,
+        embodiment_id=args.embodiment_id,
     )
     env = make_env(paths.dataset)
     evaluate_policy(
@@ -504,6 +569,7 @@ def main(args: Args) -> None:
         debug=args.debug,
         reset=args.reset,
         diverse_inst=args.diverse_inst,
+        lang_subtask_prefix=args.lang_subtask_prefix,
     )
 
 

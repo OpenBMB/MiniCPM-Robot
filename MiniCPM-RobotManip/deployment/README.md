@@ -96,8 +96,9 @@ The server also accepts the versioned envelope:
 - **CALVIN:** one frame with views ordered as
   `[rgb_static, rgb_gripper]`; the evaluator consumes the first 7 dimensions.
 - **RoboTwin:** one frame with views ordered as
-  `[head, left_wrist, right_wrist]`; the client omits its incompatible 14-D
-  state and consumes the first 14 dimensions with the required joint reorder.
+  `[head, left_wrist, right_wrist]`; the client packs measured joints and EEF
+  poses into the unified-80D layout and extracts joint actions from channels
+  `0:6`, `16`, `17:23`, and `33`.
 
 The migrated evaluators live under `MiniCPM-RobotManip/evaluation`:
 

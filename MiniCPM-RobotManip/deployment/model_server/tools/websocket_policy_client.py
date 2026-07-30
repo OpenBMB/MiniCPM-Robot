@@ -21,7 +21,7 @@ class WebsocketClientPolicy:
         port: int | None = 10093,
         *,
         open_timeout: float = 30,
-        response_timeout: float | None = 30,
+        response_timeout: float | None = 300,
         max_message_bytes: int = 16 * 1024 * 1024,
     ) -> None:
         uri = f"ws://{host}"
@@ -32,13 +32,15 @@ class WebsocketClientPolicy:
             "compression": None,
             "max_size": max_message_bytes,
             "open_timeout": open_timeout,
-            "ping_interval": None,
         }
+        connect_parameters = inspect.signature(
+            websockets.sync.client.connect
+        ).parameters
+        if "ping_interval" in connect_parameters:
+            connect_kwargs["ping_interval"] = None
         # websockets 15 added the proxy argument. Evaluator environments may use
         # websockets 13 on Python 3.8, so disable proxies only when supported.
-        if "proxy" in inspect.signature(
-            websockets.sync.client.connect
-        ).parameters:
+        if "proxy" in connect_parameters:
             connect_kwargs["proxy"] = None
         self._ws = websockets.sync.client.connect(uri, **connect_kwargs)
         self._response_timeout = response_timeout

@@ -44,7 +44,6 @@ called from any working directory:
 MINICPM_PYTHON=/path/to/minicpm/python \
 CALVIN_PYTHON=/path/to/calvin/python \
 CHECKPOINT=openbmb/MiniCPM-RobotManip \
-EMBODIMENT_ID=0 \
 CALVIN_ROOT=/path/to/CALVIN \
 CALVIN_DATASET_PATH=/path/to/task_D_D \
 OUTPUT_ROOT=/path/to/calvin-results \
@@ -68,9 +67,9 @@ and `DIVERSE_INST=1`. Diverse instructions additionally require
 `LANG_ANNOTATION_CACHE`; otherwise the standard CALVIN validation annotations
 under `CALVIN_ROOT/calvin_models/conf` are used.
 
-`EMBODIMENT_ID` is required. Set it to the ID that the selected checkpoint
-uses for CALVIN; the public checkpoint does not provide a reliable ID-to-robot
-mapping.
+`EMBODIMENT_ID` defaults to `1`, matching the CALVIN unified-80D training
+profile. Override it when evaluating a checkpoint that uses a different
+embodiment mapping.
 
 ## Run the server separately
 
@@ -80,7 +79,7 @@ server with:
 ```bash
 MINICPM_PYTHON=/path/to/minicpm/python \
 CHECKPOINT=openbmb/MiniCPM-RobotManip \
-EMBODIMENT_ID=0 \
+EMBODIMENT_ID=1 \
 HOST=127.0.0.1 \
 PORT=10093 \
 bash /path/to/MiniCPM-RobotManip/evaluation/calvin/run_policy_server.sh
@@ -99,11 +98,28 @@ order:
 1. `rgb_static`
 2. `rgb_gripper`
 
-The shared `evaluation.libero.model2libero_interface.ModelClient` manages
-action-chunk scheduling. The evaluator consumes the first seven action values
-as three translation deltas, three rotation deltas, and one gripper value. The
-gripper value is converted to CALVIN's `+1` open / `-1` close convention before
-`env.step`.
+The dedicated `evaluation.calvin.model2calvin_interface.ModelClient` manages
+action-chunk scheduling without importing the LIBERO adapter. The evaluator
+packs the current measured EEF state into channels `7:17` as xyz, interleaved
+rotation6D (`rotation_matrix[:, :2].reshape(6)`), and gripper-closed state.
+The remaining unified-80D channels are zero. At each 30-step chunk boundary,
+the client sends the latest measured `robot_obs`; predicted targets are never
+chained into later state. Every request also sends the selected embodiment ID
+explicitly; it defaults to `1`.
+
+The policy interface returns
+`{"action": float32[7], "type": "cartesian_abs"}` after converting rotation6D
+to Euler xyz. Before `env.step`, the evaluator unwraps this into CALVIN's
+native three-part absolute action `(xyz, euler_xyz, gripper)`, which is
+required by the upstream `PlayTableSimEnv`. The gripper-closed channel uses a
+strict `> 0.5` threshold and is converted to CALVIN's `+1` open / `-1` close
+convention.
+
+The model prompt identifies the robot as `CALVIN Franka/Panda` and retains the
+training metadata label `10 Hz`. By default, the language instruction is
+prefixed with its subtask key (for example,
+`open_drawer: open the drawer`). The simulator still executes one predicted
+target per native environment step by default.
 
 MiniCPM actions are execution-ready. Neither the client nor server normalizes
 or unnormalizes them, and no `unnorm_key=franka` is used.
@@ -118,6 +134,7 @@ PYTHONPATH=/path/to/MiniCPM-RobotManip \
 /path/to/calvin/python -m evaluation.calvin.eval_calvin \
   --args.host 127.0.0.1 \
   --args.port 10093 \
+  --args.embodiment-id 1 \
   --args.calvin-root /path/to/CALVIN \
   --args.dataset-path /path/to/task_D_D \
   --args.eval-log-dir /path/to/calvin-results \

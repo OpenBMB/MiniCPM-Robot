@@ -167,7 +167,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=args.port,
                 checkpoint=checkpoint,
                 embodiment_id=embodiment_id,
-                min_action_dim=7,
+                min_action_dim=17,
                 request_id="libero-readiness",
                 timeout=timeout,
             )

@@ -17,7 +17,7 @@ Environment:
   CHECKPOINT      Hub ID or local checkpoint directory
   EMBODIMENT_ID   LIBERO embodiment ID (required)
   HOST            Listening host (default: 127.0.0.1)
-  PORT            Listening port (default: 10093)
+  PORT            Listening port (default: 20000)
   GPU_ID          CUDA device exposed to the server (default: 0)
 EOF
 }
@@ -33,7 +33,7 @@ MINICPM_PYTHON="${MINICPM_PYTHON:-python}"
 CHECKPOINT="${CHECKPOINT:-openbmb/MiniCPM-RobotManip}"
 : "${EMBODIMENT_ID:?Set EMBODIMENT_ID for the selected LIBERO checkpoint}"
 HOST="${HOST:-127.0.0.1}"
-PORT="${PORT:-10093}"
+PORT="${PORT:-20000}"
 GPU_ID="${GPU_ID:-0}"
 
 cd "${MINICPM_ROOT}"

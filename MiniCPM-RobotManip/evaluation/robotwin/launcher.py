@@ -110,6 +110,8 @@ class Config:
     device: str
     host: str
     server_timeout: int
+    gripper_threshold: float
+    gripper_close_position: float
     output_root: Path
     dry_run: bool
 
@@ -167,6 +169,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--server-timeout",
         type=int,
         default=int(os.environ.get("ROBOTWIN_SERVER_TIMEOUT", "600")),
+    )
+    parser.add_argument(
+        "--gripper-threshold",
+        type=float,
+        default=float(os.environ.get("ROBOTWIN_GRIPPER_CLOSED_THRESHOLD", "0.5")),
+        help=(
+            "Gripper-closed predictions at or above this value command a closed "
+            "gripper (default 0.5)"
+        ),
+    )
+    parser.add_argument(
+        "--gripper-close-position",
+        type=float,
+        default=float(os.environ.get("ROBOTWIN_GRIPPER_CLOSE_POSITION", "0.0")),
+        help="Normalized RoboTwin gripper position used to close (default 0.0)",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -346,6 +363,10 @@ class Coordinator:
         self.internal_errors: list[str] = []
         self.schedule_path = log_dir / "schedule.tsv"
         self.status_path = log_dir / "status.tsv"
+        self.warp_cache_root = log_dir / ".warp_cache"
+
+    def warp_cache_path(self, slot: Slot) -> Path:
+        return self.warp_cache_root / f"slot{slot.index}"
 
     def register(
         self,
@@ -445,6 +466,8 @@ class Coordinator:
     def run_task(self, slot: Slot, item: WorkItem) -> int:
         task_safe = safe_label(item.task)
         slot_label = f"slot{slot.index}_gpu{safe_label(slot.gpu)}_port{slot.port}"
+        warp_cache_path = self.warp_cache_path(slot)
+        warp_cache_path.mkdir(parents=True, exist_ok=True)
         server_log = (
             self.log_dir
             / f"{item.number:03d}_{task_safe}_{self.config.mode}_{slot_label}_server.log"
@@ -497,6 +520,10 @@ class Coordinator:
                     [
                         "bash",
                         str(self.config.script_dir / "eval.sh"),
+                        "--gripper-threshold",
+                        str(self.config.gripper_threshold),
+                        "--gripper-close-position",
+                        str(self.config.gripper_close_position),
                         item.task,
                         self.config.mode,
                         self.config.run_name,
@@ -514,6 +541,7 @@ class Coordinator:
                         "ROBOTWIN_POLICY_MODULE": (
                             "evaluation.robotwin.model2robotwin_interface"
                         ),
+                        "WARP_CACHE_PATH": str(warp_cache_path),
                     },
                     start_new_session=True,
                 )
@@ -536,12 +564,14 @@ class Coordinator:
             terminate_process(server)
             self.register(slot, None, None)
 
+        last_result = None
         if eval_log.is_file():
-            for line in eval_log.read_text(
-                encoding="utf-8", errors="replace"
-            ).splitlines():
-                if "Success rate" in line:
-                    print(f"[RESULT] {item.task}: {line}")
+            with eval_log.open(encoding="utf-8", errors="replace") as file:
+                for line in file:
+                    if "Success rate" in line:
+                        last_result = line.rstrip()
+        if last_result is not None:
+            print(f"[RESULT] {item.task}: {last_result}")
         self.append_status(item, slot, status)
         return status
 
@@ -586,6 +616,8 @@ def write_manifests(
             "task_config": config.mode,
             "seed": str(config.seed),
             "default_embodiment_id": str(config.embodiment_id),
+            "gripper_threshold": str(config.gripper_threshold),
+            "gripper_close_position": str(config.gripper_close_position),
             "gpus": ",".join(slot.gpu for slot in slots),
             "ports": ",".join(str(slot.port) for slot in slots),
             "total_tasks": str(len(tasks)),
@@ -731,6 +763,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         device=os.environ.get("MINICPM_DEVICE", "cuda"),
         host="127.0.0.1",
         server_timeout=args.server_timeout,
+        gripper_threshold=args.gripper_threshold,
+        gripper_close_position=args.gripper_close_position,
         output_root=output_root,
         dry_run=False,
     )
@@ -768,6 +802,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             thread.join()
     finally:
         coordinator.stop_all()
+        shutil.rmtree(coordinator.warp_cache_root, ignore_errors=True)
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
 

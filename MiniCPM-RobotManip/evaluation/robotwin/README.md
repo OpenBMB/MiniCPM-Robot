@@ -57,7 +57,7 @@ bash MiniCPM-RobotManip/evaluation/robotwin/start_eval.sh \
   --mode demo_clean \
   --run-name minicpm_clean \
   --checkpoint openbmb/MiniCPM-RobotManip \
-  --default-embodiment-id 0 \
+  --default-embodiment-id 4 \
   adjust_bottle
 ```
 
@@ -94,8 +94,16 @@ Useful options:
 --base-port PORT
 --server-timeout SECONDS
 --default-embodiment-id ID
+--gripper-threshold VALUE
+--gripper-close-position VALUE
 --dry-run
 ```
+
+`--gripper-threshold` and `--gripper-close-position` are forwarded to every
+evaluator and recorded in `run_manifest.tsv`. They take precedence over the
+`ROBOTWIN_GRIPPER_CLOSED_THRESHOLD` / `ROBOTWIN_GRIPPER_CLOSE_POSITION`
+environment variables, which in turn take precedence over the client defaults
+(`0.5` and `0.0`). `eval.sh` accepts the same two flags for manual runs.
 
 `--name` is an alias for `--run-name`. Run `start_eval.sh --help` for all
 arguments and environment variables.
@@ -136,6 +144,12 @@ bash MiniCPM-RobotManip/evaluation/robotwin/eval.sh \
   adjust_bottle demo_clean manual_run 0 0 10093 127.0.0.1
 ```
 
+Options go before the positional arguments:
+
+```bash
+... eval.sh --gripper-threshold 0.45 adjust_bottle demo_clean manual_run 0 0
+```
+
 `eval.sh` creates a unique temporary deployment YAML, injects task, mode, run
 name, seed, and dotted policy module through RoboTwin overrides, runs from the
 external checkout, and removes the temporary file on exit.
@@ -144,21 +158,74 @@ external checkout, and removes the temporary file on exit.
 
 - Policy module:
   `evaluation.robotwin.model2robotwin_interface`
+- Shared conversions: `evaluation.robotwin.unified_ee6d`
 - Endpoint default: `127.0.0.1:10093`
 - Camera order: `[head, left_wrist, right_wrist]`
-- Client image size: `448 x 448`
-- State: omitted from the request; RoboTwin's incompatible 14-dimensional
-  joint vector is not forwarded, so the server supplies its zero80 default
+- Image size: the client resizes each frame to `448 x 448` with OpenCV
+  `INTER_AREA`, matching the reference evaluation client. The MiniCPM server then applies the
+  checkpoint's PIL `448 x 448` resize, which is an identity resample at this
+  size
+- State: EEF and closed-gripper channels are `7:17` and `24:34`; joint and
+  reserved channels remain zero. The EEF channels always carry the measured
+  endpose from the current observation
 - Action mode: absolute only; other modes fail before evaluation
 - Request: no unnormalization key, DDIM, or normalization parameters
 - Response: must be successful, finite, and shaped
-  `(1, action_chunk_size, D)` with `D >= 14`
-- RoboTwin action order:
-  `[0, 1, 2, 3, 4, 5, 12, 6, 7, 8, 9, 10, 11, 13]`
+  `(1, action_chunk_size, 80)`
+- EE action: channels `7:17` and `24:34`; gripper-closed predictions greater
+  than or equal to `ROBOTWIN_GRIPPER_CLOSED_THRESHOLD` (default `0.5`) become
+  `ROBOTWIN_GRIPPER_CLOSE_POSITION` (default `0.0`), otherwise `1.0`
+- Timing: each model target is submitted to RoboTwin once; no action repeat is
+  applied. The chunk index is driven by the client's own policy-step counter,
+  not by RoboTwin's `take_action_cnt`
+- Embodiment: this release's checkpoint maps RoboTwin to ID `4`
 
-`--default-embodiment-id` is required because the published checkpoint does
-not currently document a reliable embodiment-ID-to-robot mapping. Set it to
-the value appropriate for the checkpoint and RoboTwin setup.
+The model prompt is:
+
+```text
+The robot is RoboTwin2 ALOHA-AgileX, a simulated dual-arm ALOHA-style manipulator. Its action control method is absolute dual-arm end-effector pose in the unified 80D layout with gripper closed commands, and its action FPS is 15 Hz. Task: {instruction}
+```
+
+Use `--default-embodiment-id 4` for the unified RoboTwin checkpoint. The
+client also sends ID `4` explicitly with every request. The embodiment ID is
+checkpoint metadata rather than part of this contract; a different unified-80D
+checkpoint may use a different ID.
+
+### Ablation switches
+
+The EEF-feedback, resize, and prompt semantics are each behind an environment
+flag so a single factor can be measured in isolation. The defaults below match
+the reference RoboTwin evaluation client, so that the same observation
+produces the same 16D EE command on both sides; the alternatives reproduce the
+earlier MiniCPM-only behaviour. `ROBOTWIN_STATE_JOINTS` is off by default: the
+joint channels stay zero, and turning it on is an experiment rather than part
+of this contract.
+
+```text
+ROBOTWIN_CHAIN_EEF                  0     1 chains the last absolute command
+ROBOTWIN_CLIENT_RESIZE              1     0 sends simulator-resolution frames
+ROBOTWIN_PROMPT_STYLE               robotwin2   'legacy' uses the older wording
+ROBOTWIN_STATE_JOINTS               0     1 fills joint channels 0:6 and 17:23
+ROBOTWIN_GRIPPER_CLOSED_THRESHOLD   0.5
+ROBOTWIN_GRIPPER_CLOSE_POSITION     0.0
+ROBOTWIN_EVAL_STEP_LIMIT_BONUS      1000  0 uses the checkout's limits as-is
+```
+
+`ROBOTWIN_EVAL_STEP_LIMIT_BONUS` is added to *every* per-task evaluation step
+limit, so the RoboTwin 2.0 defaults become `1400` for `adjust_bottle` and
+`2700` for `put_bottles_dustbin`. RoboTwin reads `_eval_step_limit.yml` from
+`envs._base_task.CONFIGS_PATH` lazily, so `get_model()` writes a bumped copy to
+a temporary directory and repoints that attribute. The external checkout is
+never modified and no launcher flag is required.
+
+Action repeat, the launcher's shard/seed protocol, and simulator RNG seeding
+are *not* aligned with the reference evaluation protocol yet, so success rates are still not
+directly comparable with internal numbers.
+
+The external RoboTwin checkout supplies the base evaluation step limits, which
+this client then raises by `ROBOTWIN_EVAL_STEP_LIMIT_BONUS`. Attention backend
+selection, checkpoint format conversion, and per-episode random sequences can
+also differ from the original internal evaluation pipeline.
 
 ## License and provenance
 

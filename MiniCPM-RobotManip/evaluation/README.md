@@ -34,16 +34,16 @@ Neither the server nor these evaluators normalize or unnormalize model
 actions. Environment adapters only perform operations required by the target
 API:
 
-- LIBERO and CALVIN consume the first 7 dimensions and convert the gripper to
-  the simulator convention.
-- RoboTwin applies the migrated 14-D joint/gripper reorder.
+- LIBERO consumes unified channels `7:17` as an absolute EE6D target.
+- CALVIN consumes the first 7 dimensions and converts the gripper to the
+  simulator convention.
+- RoboTwin packs measured joints and EEF poses into unified 80D and extracts
+  the sparse absolute-joint channels.
 
-The simulator clients don't send their incompatible low-dimensional robot
-state, so the server uses MiniCPM's existing 80-D zero-state behavior.
+The simulator clients map robot state into the checkpoint's unified-80D
+channel layout before sending it to MiniCPM.
 
-The public checkpoint doesn't document a reliable embodiment-ID mapping.
-Always set the benchmark's `EMBODIMENT_ID` or
-`--default-embodiment-id` to the value required by the selected checkpoint.
+RoboTwin2 ALOHA uses embodiment ID 4 for the unified checkpoint.
 
 ## Environments
 

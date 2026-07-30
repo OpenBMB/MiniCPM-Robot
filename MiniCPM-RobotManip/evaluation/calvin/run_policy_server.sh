@@ -17,7 +17,7 @@ Environment:
   MINICPM_PYTHON   Python from the MiniCPM-RobotManip environment (default: python)
   CHECKPOINT       Hugging Face model ID or local checkpoint directory
                    (default: openbmb/MiniCPM-RobotManip)
-  EMBODIMENT_ID    MiniCPM embodiment ID used for CALVIN requests (required)
+  EMBODIMENT_ID    MiniCPM embodiment ID used for CALVIN requests (default: 1)
   HOST             Listening address (default: 127.0.0.1)
   PORT             Listening port (default: 10093)
   CUDA_VISIBLE_DEVICES
@@ -44,7 +44,7 @@ MINICPM_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 MINICPM_PYTHON="${MINICPM_PYTHON:-python}"
 CHECKPOINT="${CHECKPOINT:-openbmb/MiniCPM-RobotManip}"
-: "${EMBODIMENT_ID:?Set EMBODIMENT_ID for the selected CALVIN checkpoint}"
+EMBODIMENT_ID="${EMBODIMENT_ID:-1}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-10093}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
