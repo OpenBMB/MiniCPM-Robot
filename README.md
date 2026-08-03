@@ -38,6 +38,7 @@
   - [Benchmark Results](#benchmark-results)
   - [Quick Start](#quick-start)
   - [Inference](#inference)
+  - [Evaluation](#evaluation)
 - [MiniCPM-RobotTrack](#minicpm-robottrack)
   - [Benchmark Results](#evt-bench-results)
   - [Quick Start](#quick-start-1)
@@ -124,6 +125,25 @@ python vla_infer.py \
     --image cam_wrist.jpg \
     --text "Pick up the red block." \
     --checkpoint ./checkpoint</code></pre>
+
+### Evaluation
+
+<p>
+  Reproducible evaluation integrations for LIBERO, CALVIN, RoboTwin2, and RMBench
+  are provided under <a href="MiniCPM-RobotManip/evaluation"><code>evaluation/</code></a>.
+  The evaluators connect to the MiniCPM-RobotManip WebSocket + MessagePack model
+  server; the model server and each benchmark simulator run in separate Python
+  environments. Simulators, datasets, and assets are external dependencies and
+  must be installed according to the corresponding benchmark guide.
+</p>
+
+<ul>
+  <li><a href="MiniCPM-RobotManip/evaluation/README.md">Evaluation overview and common policy contract</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/libero/README.md">LIBERO</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/calvin/README.md">CALVIN</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/robotwin/README.md">RoboTwin2</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/rmbench/README.md">RMBench</a></li>
+</ul>
 
 ## MiniCPM-RobotTrack
 <strong>MiniCPM-RobotTrack</strong> is a compact vision-language-action policy for embodied target tracking built on MiniCPM4-0.5B with following highlights:

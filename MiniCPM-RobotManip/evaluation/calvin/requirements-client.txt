@@ -1,0 +1,13 @@
+# CALVIN itself is external and must be installed separately.
+hydra-core
+matplotlib
+moviepy<2
+msgpack
+numpy
+omegaconf
+Pillow
+scipy>=1.8,<2
+termcolor
+tqdm
+tyro>=0.8,<0.9
+websockets>=13.1,<14

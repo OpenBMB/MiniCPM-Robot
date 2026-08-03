@@ -38,6 +38,7 @@
   - [榜单结果](#榜单结果)
   - [快速开始](#快速开始)
   - [推理](#推理)
+  - [模型评测](#模型评测)
 - [MiniCPM-RobotTrack](#minicpm-robottrack)
   - [榜单结果](#evt-bench-结果)
   - [快速开始](#快速开始-1)
@@ -124,6 +125,24 @@ python vla_infer.py \
     --image cam_wrist.jpg \
     --text "Pick up the red block." \
     --checkpoint ./checkpoint</code></pre>
+
+### 模型评测
+
+<p>
+  <a href="MiniCPM-RobotManip/evaluation"><code>evaluation/</code></a>
+  目录提供 LIBERO、CALVIN、RoboTwin2 和 RMBench 的可复现评测流程。
+  评测客户端通过 WebSocket + MessagePack 连接 MiniCPM-RobotManip 模型服务；
+  模型服务与各基准模拟器分别运行在独立的 Python 环境中。模拟器、数据集和资产属于
+  外部依赖，需按照相应基准的文档另行安装。
+</p>
+
+<ul>
+  <li><a href="MiniCPM-RobotManip/evaluation/README.md">评测总览与通用策略接口约定</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/libero/README.md">LIBERO</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/calvin/README.md">CALVIN</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/robotwin/README.md">RoboTwin2</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/rmbench/README.md">RMBench</a></li>
+</ul>
 
 ## MiniCPM-RobotTrack
 <strong>MiniCPM-RobotTrack</strong> 是基于 MiniCPM4-0.5B 的轻量视觉-语言-动作策略，面向具身目标跟踪，主要亮点如下：

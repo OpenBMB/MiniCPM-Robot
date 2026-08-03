@@ -34,6 +34,7 @@ MiniCPM-RobotTrack/minicpm_robot_track/backbones/
 MiniCPM-RobotTrack/minicpm_robot_track/checkpoints/
 # Training and evaluation outputs
 outputs/
+
 checkpoints/
 results/
 sim_data/raw/
@@ -52,3 +53,11 @@ MiniCPM-RobotTrack/realworld/output/*
 *.log
 *.tmp
 *.part*
+
+.cursor/
+
+# Local tests
+MiniCPM-RobotManip/tests/
+MiniCPM-RobotManip/command
+MiniCPM-RobotManip/outputs_/
+MiniCPM-RobotManip/evaluation/tests/

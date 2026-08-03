@@ -1,0 +1,15 @@
+# Copyright 2025 starVLA community. All rights reserved.
+# Licensed under the MIT License.
+# Modifications Copyright 2026 The OpenBMB Team.
+
+# Install these in the external RoboTwin environment. RoboTwin itself provides
+# NumPy. The client resizes camera frames to 448x448 with cv2 INTER_AREA before
+# the wire, matching the reference evaluation client, so OpenCV is a hard dependency. RoboTwin
+# already installs it, but the client must not rely on that transitively.
+# ROBOTWIN_CLIENT_RESIZE=0 is the ablation that skips the client-side resize.
+msgpack==1.1.2
+opencv-python>=4.5
+# Only used to rewrite RoboTwin's _eval_step_limit.yml with the step-limit
+# bonus; RoboTwin already depends on it for its own task configs.
+PyYAML>=5.4
+websockets>=13.1,<14

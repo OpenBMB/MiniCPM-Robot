@@ -1,0 +1,9 @@
+# Evaluator-side additions only. Install LIBERO separately.
+imageio[ffmpeg]>=2.34
+matplotlib>=3.7
+msgpack>=1.0
+numpy>=1.24,<2
+Pillow>=10
+tqdm>=4.66
+tyro>=0.8,<0.9
+websockets>=13.1,<14
