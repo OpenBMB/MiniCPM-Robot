@@ -38,6 +38,7 @@
   - [Benchmark Results](#benchmark-results)
   - [Quick Start](#quick-start)
   - [Inference](#inference)
+  - [Evaluation](#evaluation)
 - [MiniCPM-RobotTrack](#minicpm-robottrack)
   - [Benchmark Results](#evt-bench-results)
   - [Quick Start](#quick-start-1)
@@ -125,21 +126,24 @@ python vla_infer.py \
     --text "Pick up the red block." \
     --checkpoint ./checkpoint</code></pre>
 
-### starVLA-compatible WebSocket server
+### Evaluation
 
-<p>The deployment server accepts one current frame with one or more synchronized camera views and is wire-compatible with the standard starVLA <code>data.actions</code> evaluators. The initial target integrations are LIBERO, CALVIN, and RoboTwin. MiniCPM actions are returned directly without normalization or un-normalization.</p>
+<p>
+  Reproducible evaluation integrations for LIBERO, CALVIN, RoboTwin2, and RMBench
+  are provided under <a href="MiniCPM-RobotManip/evaluation"><code>evaluation/</code></a>.
+  The evaluators connect to the MiniCPM-RobotManip WebSocket + MessagePack model
+  server; the model server and each benchmark simulator run in separate Python
+  environments. Simulators, datasets, and assets are external dependencies and
+  must be installed according to the corresponding benchmark guide.
+</p>
 
-<pre><code class="language-bash">cd MiniCPM-RobotManip
-python -m deployment.model_server.server_policy \
-    --checkpoint ./checkpoint \
-    --device cuda \
-    --host 127.0.0.1 \
-    --port 10093 \
-    --default-embodiment-id 0</code></pre>
-
-<p>Current inference is stateless. Versioned session and stream message types are reserved for future native streaming-context support. See <a href="MiniCPM-RobotManip/deployment/README.md">the deployment guide</a> for the request schema, evaluator camera order, metadata, and extension contract.</p>
-
-<p>Migrated LIBERO, CALVIN, and RoboTwin evaluators—including multi-GPU launchers for LIBERO and RoboTwin—are documented in the <a href="MiniCPM-RobotManip/evaluation/README.md">simulation evaluation guide</a>. Simulator code, datasets, and assets remain external installations.</p>
+<ul>
+  <li><a href="MiniCPM-RobotManip/evaluation/README.md">Evaluation overview and common policy contract</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/libero/README.md">LIBERO</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/calvin/README.md">CALVIN</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/robotwin/README.md">RoboTwin2</a></li>
+  <li><a href="MiniCPM-RobotManip/evaluation/rmbench/README.md">RMBench</a></li>
+</ul>
 
 ## MiniCPM-RobotTrack
 <strong>MiniCPM-RobotTrack</strong> is a compact vision-language-action policy for embodied target tracking built on MiniCPM4-0.5B with following highlights:
