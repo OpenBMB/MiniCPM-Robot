@@ -1,0 +1,11 @@
+# Copyright 2026 The OpenBMB Team. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License").
+
+# Install these in the external RMBench (SAPIEN) environment. RMBench itself
+# provides NumPy and OpenCV; these packages implement the MiniCPM wire client and
+# MP4 recording.
+msgpack==1.1.2
+Pillow>=10
+websockets>=13.1,<14
+imageio>=2.31
+imageio-ffmpeg>=0.4.9

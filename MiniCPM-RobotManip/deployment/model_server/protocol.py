@@ -66,8 +66,15 @@ def build_server_metadata(
     policy_metadata: dict[str, Any],
     *,
     checkpoint: str,
+    history: bool = False,
+    subtask: bool = False,
 ) -> dict[str, Any]:
-    """Build the first frame sent to every connected starVLA client."""
+    """Build the first frame sent to every connected starVLA client.
+
+    ``history`` marks a policy whose request carries a window of frames per camera
+    instead of a single time step; ``subtask`` marks one that also returns the
+    generated sub-task text alongside the actions.
+    """
     metadata = {
         "protocol_version": PROTOCOL_VERSION,
         "server": "minicpm_robot_manip",
@@ -75,8 +82,10 @@ def build_server_metadata(
         "ckpt_path": checkpoint,
         "capabilities": {
             "infer": True,
-            "single_frame": True,
+            "single_frame": not history,
             "multi_view": True,
+            "history": history,
+            "subtask": subtask,
             "streaming": False,
             "sessions": False,
             "reserved_message_types": list(RESERVED_STREAM_MESSAGE_TYPES),

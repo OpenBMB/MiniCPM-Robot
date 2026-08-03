@@ -1,9 +1,11 @@
 # MiniCPM-RobotManip WebSocket deployment
 
 This server implements the WebSocket + MessagePack/NumPy contract used by
-starVLA evaluators. The first release targets LIBERO, CALVIN, and RoboTwin.
+the LIBERO, CALVIN, RoboTwin, and RMBench evaluators. LIBERO, CALVIN, and
+RoboTwin use the single-frame policy server; RMBench uses a separate
+history-conditioned memVLA entry point.
 
-## Start the server
+## Start the single-frame server
 
 Run from `MiniCPM-RobotManip` so that both `vla_infer.py` and the `deployment`
 package are importable:
@@ -24,10 +26,12 @@ by the target robot with `--default-embodiment-id`; the published checkpoint
 doesn't provide a reliable public ID-to-robot mapping. A request-level
 `embodiment_id` overrides the server default.
 
-The default host is local-only. Bind to `0.0.0.0` only on a trusted network or
-behind an authenticated proxy.
+The default host is local-only. The server uses plaintext `ws://` and has no
+built-in authentication or TLS. Bind to `0.0.0.0` only on a trusted network or
+behind an authenticated TLS proxy. `--max-message-bytes` limits incoming frame
+size, and `--idle-timeout` can close an unused server automatically.
 
-## Inference contract
+## Single-frame inference contract
 
 An existing starVLA client sends a flat MessagePack payload:
 
@@ -44,6 +48,7 @@ An existing starVLA client sends a flat MessagePack payload:
     "do_sample": False,                     # accepted and ignored
     "use_ddim": True,                       # accepted and ignored
     "num_ddim_steps": 10,                   # accepted and ignored
+    "cfg_scale": 1.0,                       # accepted and ignored
     "embodiment_id": 0,                     # optional
     "seed": 123,                            # optional
 }
@@ -65,7 +70,9 @@ The response matches current starVLA clients:
     "type": "inference_result",
     "request_id": "default",
     "data": {
-        "actions": actions,  # np.float32, shape (1, 30, 80)
+        # np.float32, shape (1, action_chunk_size, action_dim);
+        # (1, 30, 80) for the published checkpoint
+        "actions": actions,
     },
 }
 ```
@@ -91,19 +98,22 @@ The server also accepts the versioned envelope:
 ## Target evaluators
 
 - **LIBERO:** one frame with views ordered as
-  `[agentview, eye_in_hand]`; the evaluator consumes the first 7 action
-  dimensions.
+  `[agentview, eye_in_hand]`; the evaluator consumes unified channels `7:17`
+  as an absolute EE6D target.
 - **CALVIN:** one frame with views ordered as
-  `[rgb_static, rgb_gripper]`; the evaluator consumes the first 7 dimensions.
+  `[rgb_static, rgb_gripper]`; the evaluator consumes unified channels `7:17`
+  and converts them to CALVIN's native 7D absolute Cartesian action.
 - **RoboTwin:** one frame with views ordered as
-  `[head, left_wrist, right_wrist]`; the client packs measured joints and EEF
-  poses into the unified-80D layout and extracts joint actions from channels
-  `0:6`, `16`, `17:23`, and `33`.
+  `[head, left_wrist, right_wrist]`; the client packs measured EEF poses into
+  unified channels `7:17` and `24:34` (joint channels are zero by default) and
+  extracts those EE6D channels as absolute dual-arm end-effector targets.
 
 The migrated evaluators live under `MiniCPM-RobotManip/evaluation`:
 
 ```bash
 # LIBERO multi-GPU
+MINICPM_PYTHON=/path/to/minicpm/python \
+LIBERO_PYTHON=/path/to/libero/python \
 LIBERO_HOME=/path/to/LIBERO GPU_LIST="0 1" EMBODIMENT_ID=0 \
 bash evaluation/libero/auto_eval_scripts/auto_eval_libero.sh \
   --checkpoint openbmb/MiniCPM-RobotManip
@@ -112,15 +122,17 @@ bash evaluation/libero/auto_eval_scripts/auto_eval_libero.sh \
 MINICPM_PYTHON=/path/to/minicpm/python \
 CALVIN_PYTHON=/path/to/calvin/python \
 CALVIN_ROOT=/path/to/CALVIN CALVIN_DATASET_PATH=/path/to/task_D_D \
-EMBODIMENT_ID=0 \
+EMBODIMENT_ID=1 \
 bash evaluation/calvin/eval_calvin.sh
 
 # RoboTwin multi-GPU
+MINICPM_PYTHON=/path/to/minicpm/python \
+ROBOTWIN_PYTHON=/path/to/robotwin/python \
 ROBOTWIN_PATH=/path/to/RoboTwin \
 bash evaluation/robotwin/start_eval.sh \
   --mode demo_clean --run-name minicpm \
   --checkpoint openbmb/MiniCPM-RobotManip \
-  --default-embodiment-id 0 all
+  --default-embodiment-id 4 all
 ```
 
 All migrated clients resize to 448×448 and send no normalization, DDIM, or
@@ -130,12 +142,50 @@ setup, single-worker commands, and camera/action contracts.
 
 LIBERO OpenPI, BEHAVIOR's `normalized_actions` response, and VLN-CE's text
 generation protocol are different wire contracts and are not supported by
-this server.
+the single-frame server.
+
+## RMBench history-conditioned server
+
+RMBench uses the memVLA server rather than `server_policy`:
+
+```bash
+conda activate MiniCPM-RobotManip
+cd MiniCPM-RobotManip
+python -m deployment.model_server.server_policy_memvla \
+  --checkpoint openbmb/MiniCPM-RobotManip \
+  --device cuda \
+  --host 127.0.0.1 \
+  --port 10094 \
+  --default-embodiment-id 4
+```
+
+One request contains exactly one history window. `examples[0].views` is an
+ordered list of per-camera frame lists for `[head, left_wrist, right_wrist]`.
+The published recipe requires 60 strided head-camera frames plus the current
+frame from each wrist camera (62 frames total). The response contains
+`data.actions` with shape `(1, 30, 80)` and generated `data.subtask` text.
+Handshake capabilities report `history=true` and `subtask=true`.
+
+Use the benchmark launcher for normal evaluation; it starts one memVLA server
+and one simulator driver per GPU:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 \
+RMBENCH_PATH=/path/to/RMBench \
+MINICPM_PYTHON=/path/to/minicpm/python \
+RMBENCH_PYTHON=/path/to/rmbench/python \
+bash evaluation/rmbench/start_eval.sh \
+  --checkpoint openbmb/MiniCPM-RobotManip \
+  --seeds-per-task 25
+```
+
+See `evaluation/rmbench/README.md` for the frozen history recipe, simulator
+setup, rendering requirements, and action mapping.
 
 ## Reserved streaming extension
 
-Stateless `infer` and `predict_action` always mean one complete current frame.
-They will remain unchanged when streaming is added.
+For the single-frame server, stateless `infer` and `predict_action` always mean
+one complete current frame. They will remain unchanged when streaming is added.
 
 Protocol version 1 reserves four envelope message types:
 
@@ -155,7 +205,11 @@ session manager and register those handlers without changing MessagePack
 encoding, the receive loop, error responses, or stateless inference.
 Multi-view images are never interpreted as temporal history.
 
-## Smoke test
+## Single-frame smoke test
+
+Start `deployment.model_server.server_policy` first, then run this from the
+`MiniCPM-RobotManip` directory in an environment containing the deployment
+client dependencies:
 
 ```python
 import numpy as np
@@ -169,10 +223,4 @@ with WebsocketClientPolicy("127.0.0.1", 10093) as client:
         "examples": [{"image": [image], "lang": "Move forward."}],
     })
     print(response["data"]["actions"].shape)
-```
-
-Run protocol and adapter tests without loading the checkpoint:
-
-```bash
-python -m unittest discover -s tests -p 'test_*.py' -v
 ```
